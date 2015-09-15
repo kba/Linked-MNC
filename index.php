@@ -57,7 +57,7 @@ else
     else 
     {
         http_response_code(300);
-        if (strpos('html', $_SERVER['ACCEPT']) !== false)
+        if (strpos($_SERVER['HTTP_ACCEPT'], 'html') !== false)
         {
             header('Content-Type: text/html');
             echo '<html><body>';
