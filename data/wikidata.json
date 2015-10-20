@@ -1,0 +1,54 @@
+{
+  "ddc": {
+    "wikidataProp": 1036,
+    "localLabels": "data/ddc22.json",
+    "urlFormat": "http://dewey.info/class/$1/"
+  },
+  "isfdb": {
+    "wikidataProp": 1234,
+    "urlFormat": "http://www.isfdb.org/cgi-bin/pl.cgi?$1"
+  },
+  "parsons": {
+    "wikidataProp": 1236
+  },
+  "jstor": {
+    "wikidataProp": 1230
+  },
+  "viaf": {
+    "wikidataProp": 214
+  },
+  "gnd": {
+    "wikidataProp": 227
+  },
+  "issn": {
+    "wikidataProp": 236
+  },
+  "rvk": {
+    "wikidataProp": 1150,
+    "localLabels": "data/rvk.json"
+  },
+  "lcsn": {
+    "wikidataProp": 1144
+  },
+  "lcc": {
+    "wikidataProp": 1149
+  },
+  "coden": {
+    "wikidataProp": 1159
+  },
+  "freebase": {
+    "wikidataProp": 646
+  },
+  "worldcat": {
+    "wikidataProp": 243
+  },
+  "scopus": {
+    "wikidataProp": 1156
+  },
+  "musicbrainz": {
+    "wikidataProp": 435
+  },
+  "orcid": {
+    "wikidataProp": 496
+  }
+}

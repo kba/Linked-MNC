@@ -36,20 +36,143 @@
 
 $API_WP = 'http://www.wikidata.org/w/api.php';
 $API_QUERY = 'http://wdq.wmflabs.org/api';
-$PROP_CODES = json_decode(file_get_contents('props.json'));
+$PROP_CODES = json_decode(file_get_contents('data/wikidata.json'));
+
+$ID = @$_GET['id'];
+$PROP = @$_GET['prop'];
+$LANG = isset($_GET['lang']) ? $_GET['lang'] : 'en';
+
+function isBrowserRequest()
+{
+    return strpos($_SERVER['HTTP_ACCEPT'], 'html') !== false;
+}
+
+function validateParameters()
+{
+    global $PROP_CODES;
+    if (!isset($_GET['prop'])) 
+    {
+        http_response_code(400);
+        header('Content-Type: text/plain');
+        echo "Must set 'prop'";
+        exit;
+    }
+    else if (!array_key_exists($_GET['prop'], $PROP_CODES))
+    {
+        http_response_code(400);
+        header('Content-Type: text/plain');
+        echo "Unknown property '{$_GET['prop']}'. Known identifiers: ";
+        echo json_encode($PROP_CODES, JSON_PRETTY_PRINT);
+        exit;
+    }
+    if (!isset($_GET['id'])) 
+    {
+        http_response_code(400);
+        header('Content-Type: text/plain');
+        echo "Must set 'id'";
+        exit;
+    }
+}
+
+function sendBrowserResponse()
+{
+    global $PROP_CODES, $PROP, $ID, $LANG;
+    $items = getWikidataItems($PROP, $ID);
+    header('Content-Type: text/html ; charset=UTF-8');
+    echo '<html>';
+    echo '<head>';
+    echo '<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css"/>';
+    echo '</head>';
+    echo '<body>';
+    if (array_key_exists("localLabels", $PROP_CODES->$PROP))
+    {
+        $localLabels = json_decode(file_get_contents($PROP_CODES->{$PROP}->{"localLabels"}));
+        $localLang = array_key_exists($LANG, $localLabels) ? $LANG :
+            array_key_exists('de', $localLabels) ? 'de' : 'en';
+        echo "<h1>" . strtoupper($PROP) . " " . $ID;
+        if (array_key_exists($ID, $localLabels->$localLang))
+        {
+            echo "&mdash; {$localLabels->$localLang->$ID}";
+        }
+        echo "</h1>";
+    }
+    if (array_key_exists("urlFormat", $PROP_CODES->$PROP))
+    {
+        echo 'Authoritative Source: <a href="';
+        echo preg_replace('/\$1/', $ID, $PROP_CODES->$PROP->{"urlFormat"});
+        echo '">';
+        echo parse_url($PROP_CODES->$PROP->{"urlFormat"}, PHP_URL_HOST);
+        echo '&rarr;';
+        echo $ID;
+        echo '</a>';
+
+    }
+    if (count($items) === 0)
+    {
+        echo "<p>No results from Wikidata</p>";
+    }
+    else {
+        echo '<ul>';
+        foreach ($items as $item)
+        {
+            $meta = getMetadataFor($item);
+            $label = $meta->{"labels"}->{$LANG}->{"value"};
+            $wpLink = $meta->{"sitelinks"}->{"{$LANG}wiki"}->{"url"};
+            $uri = createItemLink($item);
+            echo "<li><a href='$uri'>$label (Q$item)</a>";
+            echo " <a href='http://tools.wmflabs.org/reasonator/?q=$item'>";
+            echo '<img src="http://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Reasonator_logo_proposal.png/16px-Reasonator_logo_proposal.png"/>';
+            echo '</a>';
+            echo " <a href='$wpLink'>";
+            echo '<img style="height:16px" src="https://upload.wikimedia.org/wikipedia/commons/2/20/Wikipedia-icon.png"/>';
+            echo '</a>';
+            echo "</li>";
+        }
+        echo '</ul>';
+    }
+    echo '</body></html>';
+}
+
+function sendLinkedDataResponse()
+{
+    $items = getWikidataItems($PROP, $ID);
+    if (count($items) == 0)
+    {
+        http_response_code(404);
+        header('Content-Type: text/plain');
+        echo "Wikidata has no information about {$PROP} '{$ID}'";
+        exit;
+    }
+    else if (count($items) == 1 && !isset($_GET['noredirect']))
+    {
+        http_response_code(303);
+        header('Location: ' . createItemLink($items[0]));
+    }
+    else 
+    {
+        http_response_code(300);
+        header('Content-Type: text/plain');
+        foreach ($items as $item)
+        {
+            echo createItemLink($item);
+            echo "\n";
+        }
+
+    }
+}
 
 function getMetadataFor($numericId)
 {
     global $API_WP;
-    $id = 'Q' . $numericId;
+    $ID = 'Q' . $numericId;
     $query = http_build_query(array(
         "action" => "wbgetentities",
         "format" => "json",
         "props"  => "labels|sitelinks/urls",
-        "ids"   =>  $id
+        "ids"   =>  $ID
     ));
     $apiResponse = json_decode(file_get_contents($API_WP . '?' . $query));
-    return $apiResponse->{"entities"}->{$id};
+    return $apiResponse->{"entities"}->{$ID};
 }
 
 function createItemLink($numericId)
@@ -62,12 +185,12 @@ function createPropLink($numericId)
     return 'http://wikidata.org/wiki/Special:EntityData/P' . $numericId;
 }
 
-function getItems($prop, $id)
+function getWikidataItems($PROP, $ID)
 {
     global $PROP_CODES, $API_QUERY;
-    $propCode = $PROP_CODES->$prop;
+    $propCode = $PROP_CODES->$PROP->{"wikidataProp"};
     $apiQuery = http_build_query(array(
-        'q' => "string[$propCode:\"{$id}\"]"
+        'q' => "string[$propCode:\"{$ID}\"]"
     ));
     $apiResponse = json_decode(file_get_contents($API_QUERY . '?' . $apiQuery));
     $items = $apiResponse->items;
@@ -93,102 +216,34 @@ function getItems($prop, $id)
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 /*
- *
+ * Actual handling
  *
  */
 
-if (!isset($_GET['prop'])) 
+validateParameters();
+
+
+if (isBrowserRequest())
 {
-    http_response_code(400);
-    header('Content-Type: text/plain');
-    echo "Must set 'prop'";
-    exit;
+    sendBrowserResponse();
 }
-else if (!array_key_exists($_GET['prop'], $PROP_CODES))
-{
-    http_response_code(400);
-    header('Content-Type: text/plain');
-    echo "Unknown property '{$_GET['prop']}'. Known identifiers: ";
-    echo json_encode($PROP_CODES, JSON_PRETTY_PRINT);
-    exit;
-}
-if (!isset($_GET['id'])) 
-{
-    http_response_code(400);
-    header('Content-Type: text/plain');
-    echo "Must set 'id'";
-    exit;
+else {
+    sendLinkedDataResponse();
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-$id = $_GET['id'];
-$prop = $_GET['prop'];
-$lang = isset($_GET['lang']) ? $_GET['lang'] : 'en';
-$items = getItems($prop, $id);
-
-if (count($items) == 0)
-{
-    http_response_code(404);
-    header('Content-Type: text/plain');
-    echo "Wikidata has no information about {$prop} '{$id}'";
-    exit;
-}
-else if (count($items) == 1 && !isset($_GET['noredirect']))
-{
-    http_response_code(303);
-    header('Location: ' . createItemLink($items[0]));
-}
-else 
-{
-    http_response_code(300);
-    if (strpos($_SERVER['HTTP_ACCEPT'], 'html') !== false)
-    {
-        header('Content-Type: text/html ; charset=UTF-8');
-        echo '<html><body>';
-        echo '<ul>';
-        foreach ($items as $item)
-        {
-            $meta = getMetadataFor($item);
-            $label = $meta->{"labels"}->{$lang}->{"value"};
-            $wpLink = $meta->{"sitelinks"}->{"{$lang}wiki"}->{"url"};
-            $uri = createItemLink($item);
-            echo "<li><a href='$uri'>$label (Q$item)</a>";
-            echo " <a href='http://tools.wmflabs.org/reasonator/?q=$item'>";
-            echo '<img src="http://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Reasonator_logo_proposal.png/16px-Reasonator_logo_proposal.png"/>';
-            echo '</a>';
-            echo " <a href='$wpLink'>";
-            echo '<img style="height:16px" src="https://upload.wikimedia.org/wikipedia/commons/2/20/Wikipedia-icon.png"/>';
-            echo '</a>';
-            echo "</li>";
-        }
-        echo '</ul>';
-        echo '</body></html>';
-    }
-    else {
-        header('Content-Type: text/plain');
-        foreach ($items as $item)
-        {
-            echo createItemLink($item);
-            echo "\n";
-        }
-    }
-
-}
-
+// vim: sw=4 ts=4:
 ?>
