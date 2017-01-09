@@ -87,12 +87,14 @@ function sendBrowserResponse()
     if (array_key_exists("localLabels", $PROP_CODES->$PROP))
     {
         $localLabels = json_decode(file_get_contents($PROP_CODES->{$PROP}->{"localLabels"}));
+        // error_log(file_get_contents($PROP_CODES->{$PROP}->{"localLabels"}));
+        // error_log(json_decode(file_get_contents($PROP_CODES->{$PROP}->{"localLabels"})));
         $localLang = array_key_exists($LANG, $localLabels) ? $LANG :
-            array_key_exists('de', $localLabels) ? 'de' : 'en';
+            array_key_exists($LANG, $localLabels) ? 'de' : 'en';
         echo "<h1>" . strtoupper($PROP) . " " . $ID;
-        if (array_key_exists($ID, $localLabels->$localLang))
+        if (array_key_exists($ID, $localLabels))
         {
-            echo "&mdash; {$localLabels->$localLang->$ID}";
+            echo "&mdash; {$localLabels->{$localLang}->{$ID}}";
         }
         echo "</h1>";
     }
